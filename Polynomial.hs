@@ -1,5 +1,6 @@
 module Polynomial(mkPoly, mkMono,
-                  plus, times) where
+                  plus, times,
+                  pseudoDivide) where
 
 import Data.List as L
 import Data.Map as M
@@ -15,7 +16,15 @@ monomialTimes :: Integer -> Monomial -> Monomial
 monomialTimes i (Monomial c ms) = Monomial (i*c) ms
 
 instance Show Monomial where
-  show (Monomial c vars) = show c ++ "*" ++ show vars
+  show (Monomial c vars) = show c ++ "*" ++ (printVars $ M.toList vars)
+
+printVars :: [(String, Integer)] -> String
+printVars [] = ""
+printVars ((x, p):[]) =
+  x ++ "^" ++ (show p)
+printVars ((x, p):(y, q):rest) =
+  x ++ "^" ++ (show p) ++ "*" ++
+  y ++ "^" ++ (show q) ++ (printVars rest)
 
 data Polynomial = Polynomial (Set Monomial)
                   deriving (Eq, Ord)
@@ -39,3 +48,6 @@ simplify ms =
       mPlus = (\(Monomial c1 m1) (Monomial c2 _) -> Monomial (c1 + c2) m1)
       results = L.map (\terms -> L.foldr mPlus (L.head terms) (L.tail terms)) grouped in
    results
+
+pseudoDivide :: String -> Polynomial -> Polynomial -> (Monomial, Polynomial, Polynomial)
+pseudoDivide var f g = (mkMono 1 [], f, f)
