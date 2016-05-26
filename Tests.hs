@@ -20,6 +20,13 @@ main = hspec $ do
        (mkPoly [mkMono 5 [("x", 3), ("y", 4)]])) `shouldBe`
         (mkPoly [mkMono 7 [("x", 3), ("y", 4)]])
 
+  describe "Leading coefficient" $ do
+    it "Univariate, one term" $ do
+      (lcof "x" $ mkPoly [mkMono 3 [("x", 4)]]) `shouldBe` mkPoly [mkMono 3 []]
+
+    it "Multivariate, a few terms" $ do
+    (lcof "x" $ mkPoly [mkMono 3 [("x", 4), ("z", 2)], mkMono (-4) [("x", 2), ("y", 3)]]) `shouldBe` (mkPoly [mkMono 3 [("z", 2)]])
+
   describe "Pseudo division" $ do
 
     it "simple pseudo division with remainder" $ do
@@ -28,4 +35,4 @@ main = hspec $ do
           b = mkMono 1 []
           q = mkPoly []
           r = mkPoly [] in
-       pseudoDivide "x" f g `shouldBe` (b, q, r)
+       pseudoDivide "x" f g `shouldBe` (one, q, r)
