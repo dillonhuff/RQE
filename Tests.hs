@@ -25,11 +25,25 @@ main = hspec $ do
       (lcof "x" $ mkPoly [mkMono 3 [("x", 4)]]) `shouldBe` mkPoly [mkMono 3 []]
 
     it "Multivariate, a few terms" $ do
-    (lcof "x" $ mkPoly [mkMono 3 [("x", 4), ("z", 2)], mkMono (-4) [("x", 2), ("y", 3)]]) `shouldBe` (mkPoly [mkMono 3 [("z", 2)]])
+    (lcof "x" $ mkPoly [mkMono 3 [("x", 4), ("z", 2)],
+                        mkMono (-4) [("x", 2), ("y", 3)]])
+      `shouldBe`
+      (mkPoly [mkMono 3 [("z", 2)]])
+
+  describe "Division" $ do
+    it "Two univariate polynomials" $ do
+      divide "x" (mkPoly [mkMono 4 [("x", 2)]]) (mkPoly [mkMono 1 [("x", 1)]])
+      `shouldBe`
+      Just (mkPoly [mkMono 4 [("x", 1)]], zero)
 
   describe "Pseudo division" $ do
 
-    it "simple pseudo division with remainder" $ do
+    it "deg(f) > deg(g)" $ do
+      let f = mkPoly [mkMono 1 [("x", 2)], mkMono 1 [("y", 2)]]
+          g = mkPoly [mkMono 1 [("x", 7)], mkMono (-1) [("y", 1)]] in
+       pseudoDivide "x" f g `shouldBe` (one, zero, f)
+
+    it "with remainder" $ do
       let f = mkPoly [mkMono 1 [("x", 2)], mkMono 1 [("y", 2)]]
           g = mkPoly [mkMono 1 [("x", 1)], mkMono (-1) [("y", 1)]]
           b = mkMono 1 []
