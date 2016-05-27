@@ -11,7 +11,7 @@ data Monomial = Monomial Integer (Map String Integer)
                 deriving (Eq, Ord)
 
 mkMono :: Integer -> [(String, Integer)] -> Monomial
-mkMono i vars = Monomial i (M.fromList vars)
+mkMono i vars = Monomial i (M.fromList $ L.filter (\(_, c) -> c /= 0) vars)
 
 monoCoeff (Monomial c _) = c
 
@@ -61,7 +61,7 @@ instance Show Polynomial where
      else sumList $ S.toList rs
 
 one = mkPoly [mkMono 1 []]
-zero = mkPoly []
+zero = mkPoly [mkMono 0 []]
 
 sumList :: Show a => [a] -> String
 sumList [] = ""
@@ -69,7 +69,7 @@ sumList [x] = show x
 sumList (x:y:rest) = show x ++ " + " ++  show y ++ (sumList rest)
 
 mkPoly :: [Monomial] -> Polynomial
-mkPoly monomials = Polynomial $ S.fromList $ L.filter (\m -> monoCoeff m == 0) monomials
+mkPoly monomials = Polynomial $ S.fromList $ L.filter (\m -> monoCoeff m /= 0) monomials
 
 timesInt :: Integer -> Polynomial -> Polynomial
 timesInt i (Polynomial ms) = Polynomial (S.map (\m -> monomialTimes i m) ms)
@@ -81,7 +81,7 @@ times (Polynomial ps) (Polynomial qs) =
    mkPoly $ simplify $ L.concatMap (\m -> L.map (\t -> monomialProd m t) q) p
 
 plus :: Polynomial -> Polynomial -> Polynomial
-plus (Polynomial m1) (Polynomial m2) = Polynomial $ S.fromList $ simplify ((S.toList m1) ++ (S.toList m2))
+plus (Polynomial m1) (Polynomial m2) = mkPoly $ simplify ((S.toList m1) ++ (S.toList m2))
 
 minus :: Polynomial -> Polynomial -> Polynomial
 minus f g = plus f (timesInt (-1) g)
@@ -152,8 +152,8 @@ rdivide var f g q =
        let c = times (mkPoly [mkMono 1 [(var, deg var f - deg var g)]]) res
            qn = plus q c
            fn = minus f (times c g) in
-        (qn, fn)
-        --rdivide var fn g qn --(qn, fn)
+        --(qn, fn)
+        rdivide var fn g qn --(qn, fn)
 --        (plus q c, minus f (times c g)) --rdivide var (minus f (times res g)) g (plus q res)
      Nothing -> (q, f)
 

@@ -47,6 +47,6 @@ main = hspec $ do
       let f = mkPoly [mkMono 1 [("x", 2)], mkMono 1 [("y", 2)]]
           g = mkPoly [mkMono 1 [("x", 1)], mkMono (-1) [("y", 1)]]
           b = mkMono 1 []
-          q = mkPoly []
-          r = mkPoly [] in
+          q = mkPoly [mkMono 1 [("x", 1)], mkMono 1 [("y", 1)]]
+          r = mkPoly [mkMono 2 [("y", 2)]] in
        pseudoDivide "x" f g `shouldBe` (one, q, r)
