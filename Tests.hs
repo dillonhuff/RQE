@@ -2,6 +2,7 @@ module Tests(main) where
 
 import Test.Hspec
 
+import Logic
 import Polynomial
 
 main :: IO ()
@@ -43,10 +44,29 @@ main = hspec $ do
           g = mkPoly [mkMono 1 [("x", 7)], mkMono (-1) [("y", 1)]] in
        pseudoDivide "x" f g `shouldBe` (one, zero, f)
 
+    it "Multivariate, b != 1, no remainder" $ do
+      let f = mkPoly [mkMono 9 [("z", 5), ("x", 2), ("y", 2), ("w", 4)]]
+          g = mkPoly [mkMono 2 [("z", 1), ("x", 2), ("y", 1)]]
+          (b, q, r) = pseudoDivide "z" f g in
+       (times b f) `shouldBe` (plus (times q g) r)
+
     it "with remainder" $ do
       let f = mkPoly [mkMono 1 [("x", 2)], mkMono 1 [("y", 2)]]
           g = mkPoly [mkMono 1 [("x", 1)], mkMono (-1) [("y", 1)]]
-          b = mkMono 1 []
           q = mkPoly [mkMono 1 [("x", 1)], mkMono 1 [("y", 1)]]
           r = mkPoly [mkMono 2 [("y", 2)]] in
        pseudoDivide "x" f g `shouldBe` (one, q, r)
+
+  describe "Derivative" $ do
+
+    it "Multivariate polynomial" $ do
+      let f = mkPoly [mkMono 9 [("z", 5), ("x", 2), ("y", 2), ("w", 4)],
+                      mkMono 2 [("z", 1), ("x", 2), ("y", 1)]]
+          fp = mkPoly [mkMono 36 [("z", 5), ("x", 2), ("y", 2), ("w", 3)]] in
+       derivative "w" f `shouldBe` fp
+
+  describe "Quantifier elimination" $ do
+
+    it "One Variable and one quantifier" $ do
+      let f = mkPoly [mkMono 3 [("x", 1)]] in
+       (projectFormula "x" (gtz f)) `shouldBe` true

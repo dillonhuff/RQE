@@ -1,7 +1,9 @@
-module Polynomial(mkPoly, mkMono, one, zero,
+module Polynomial(Polynomial,
+                  mkPoly, mkMono, one, zero,
                   lcof,
-                  plus, times, divide,
-                  pseudoDivide) where
+                  plus, times,
+                  derivative,
+                  divide, pseudoDivide) where
 
 import Data.List as L
 import Data.Map as M
@@ -28,6 +30,9 @@ monomialProd (Monomial c1 m1) (Monomial c2 m2) =
 deleteVar :: String -> Monomial -> Monomial
 deleteVar x (Monomial c vars) = Monomial c $ M.delete x vars
 
+setMonoDegree var d (Monomial c vars) =
+  Monomial c $ M.insert var d vars
+
 monoDegree var (Monomial _ vars) =
   case M.lookup var vars of
    Just d -> d
@@ -44,11 +49,13 @@ instance Show Monomial where
 
 printVars :: [(String, Integer)] -> String
 printVars [] = ""
-printVars ((x, p):[]) =
-  x ++ "^" ++ (show p)
+printVars ((x, p):[]) = showExp x p
 printVars ((x, p):(y, q):rest) =
-  x ++ "^" ++ (show p) ++ "*" ++
-  y ++ "^" ++ (show q) ++ (printVars rest)
+  (showExp x p) ++ "*" ++
+  (showExp y q) ++ (printVars rest)
+
+showExp x 1 = x
+showExp x p = x ++ "^" ++ show p
 
 data Polynomial = Polynomial (Set Monomial)
                   deriving (Eq, Ord)
@@ -60,16 +67,20 @@ instance Show Polynomial where
      then "0"
      else sumList $ S.toList rs
 
-one = mkPoly [mkMono 1 []]
-zero = mkPoly [mkMono 0 []]
-
 sumList :: Show a => [a] -> String
 sumList [] = ""
 sumList [x] = show x
-sumList (x:y:rest) = show x ++ " + " ++  show y ++ (sumList rest)
+sumList (x:y:[]) = show x ++ " + " ++  show y
+sumList (x:y:rest) = show x ++ " + " ++  show y ++ " + " ++ (sumList rest)
+
+one = mkPoly [mkMono 1 []]
+zero = mkPoly [mkMono 0 []]
 
 mkPoly :: [Monomial] -> Polynomial
 mkPoly monomials = Polynomial $ S.fromList $ L.filter (\m -> monoCoeff m /= 0) monomials
+
+mkPolyS :: Set Monomial -> Polynomial
+mkPolyS monomials = Polynomial $ S.filter (\m -> monoCoeff m /= 0) monomials
 
 timesInt :: Integer -> Polynomial -> Polynomial
 timesInt i (Polynomial ms) = Polynomial (S.map (\m -> monomialTimes i m) ms)
@@ -115,7 +126,10 @@ pseudoDivide var f g =
   (b, q, r)
 
 divide :: String -> Polynomial -> Polynomial -> Maybe (Polynomial, Polynomial)
-divide var f g = Just $ rdivide var f g zero
+divide var f g =
+  case g == zero of
+   True -> Nothing
+   False -> Just $ rdivide var f g zero
 
 divideEvenly var f g = do
   (q, r) <- divide var f g
@@ -152,9 +166,7 @@ rdivide var f g q =
        let c = times (mkPoly [mkMono 1 [(var, deg var f - deg var g)]]) res
            qn = plus q c
            fn = minus f (times c g) in
-        --(qn, fn)
-        rdivide var fn g qn --(qn, fn)
---        (plus q c, minus f (times c g)) --rdivide var (minus f (times res g)) g (plus q res)
+        rdivide var fn g qn
      Nothing -> (q, f)
 
 nextRes var f g =
@@ -163,3 +175,7 @@ nextRes var f g =
      case nextVar lcf lcg of
       Just nextVar -> divideEvenly nextVar lcf lcg
       Nothing -> intDiv lcf lcg
+
+derivative :: String -> Polynomial -> Polynomial
+derivative var (Polynomial ms) =
+  mkPolyS $ S.map (\m -> setMonoDegree var ((monoDegree var m) - 1) $ monomialTimes (monoDegree var m) m) $ S.filter (\m -> monoDegree var m /= 0) ms
