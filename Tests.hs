@@ -67,6 +67,19 @@ main = hspec $ do
 
   describe "Quantifier elimination" $ do
 
+    it "All constants, false" $ do
+      (projectFormula "x" (eqz (mkCon 3))) `shouldBe` false
+
+    it "All constants, true" $ do
+      (projectFormula "x" (gtz (mkCon 3))) `shouldBe` true
+
+    it "All constants, true" $ do
+      (projectFormula "x" (dis (eqz (mkCon (-3))) (gtz (mkCon 3)))) `shouldBe` true
+
     it "One Variable and one quantifier" $ do
       let f = mkPoly [mkMono 3 [("x", 1)]] in
        (projectFormula "x" (gtz f)) `shouldBe` true
+
+    it "One variable, false" $ do
+      let f = mkPoly [mkMono 3 [("x", 1)]] in
+       (projectFormula "x" (con (gtz f) (ltz f))) `shouldBe` true

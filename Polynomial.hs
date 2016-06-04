@@ -1,9 +1,11 @@
 module Polynomial(Polynomial,
-                  mkPoly, mkMono, one, zero,
+                  mkCon, mkPoly, mkMono, one, zero,
+                  isCon, getCon,
+                  deg,
                   lcof,
                   plus, times,
                   derivative,
-                  divide, pseudoDivide) where
+                  divide, pseudoDivide, pseudoRemainder) where
 
 import Data.List as L
 import Data.Map as M
@@ -73,11 +75,16 @@ sumList [x] = show x
 sumList (x:y:[]) = show x ++ " + " ++  show y
 sumList (x:y:rest) = show x ++ " + " ++  show y ++ " + " ++ (sumList rest)
 
+isCon p = (S.size $ varSet p) == 0
+
 one = mkPoly [mkMono 1 []]
 zero = mkPoly [mkMono 0 []]
 
 mkPoly :: [Monomial] -> Polynomial
 mkPoly monomials = Polynomial $ S.fromList $ L.filter (\m -> monoCoeff m /= 0) monomials
+
+mkCon :: Integer -> Polynomial
+mkCon i = mkPoly [mkMono i []]
 
 mkPolyS :: Set Monomial -> Polynomial
 mkPolyS monomials = Polynomial $ S.filter (\m -> monoCoeff m /= 0) monomials
@@ -119,6 +126,11 @@ deg var (Polynomial ts) =
   then 0
   else L.maximum $ S.toList $ S.map (\m -> monoDegree var m) ts
 
+pseudoRemainder :: String -> Polynomial -> Polynomial -> Polynomial
+pseudoRemainder s f g =
+  let (_, _, r) = pseudoDivide s f g in
+   r
+
 pseudoDivide :: String -> Polynomial -> Polynomial -> (Polynomial, Polynomial, Polynomial)
 pseudoDivide var f g =
   let b = pow (lcof var g) (L.maximum [(deg var f) - (deg var g) + 1, 0])
@@ -144,6 +156,12 @@ nextVar f g =
   case S.size vars of
    0 -> Nothing
    _ -> Just $ S.findMax vars
+
+getCon :: Polynomial -> Integer
+getCon p@(Polynomial m) =
+  if S.size m == 0
+  then 0
+  else monoCoeff $ S.findMax m
 
 intDiv :: Polynomial -> Polynomial -> Maybe Polynomial
 intDiv p1@(Polynomial m1) p2@(Polynomial m2) =
