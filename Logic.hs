@@ -64,6 +64,7 @@ satRows (Pred (Pr "=" p)) st = S.fromList $ selectIntervals Zero p st
 satRows (Pred (Pr ">" p)) st = S.fromList $ selectIntervals Pos p st
 satRows (Pred (Pr "<" p)) st = S.fromList $ selectIntervals Neg p st
 satRows (Binop "\\/" l r) st = S.union (satRows l st) (satRows r st)
+satRows (Binop "/\\" l r) st = S.intersection (satRows l st) (satRows r st)
 satRows f sts = error $ "satRows, f = " ++ show f
 
 signTables :: String -> [Polynomial] -> [(Formula ArithPred, SignTable)]
@@ -122,15 +123,20 @@ reconstructTable s p remMap (f, st) =
       m = condenseSignTable p remMap st
       signMaps = inferSigns p pSgnMap m
       n = deleteColumn (derivative s p) m in
-   L.map (\(g, m) -> (con f g, mergeMap p m n)) signMaps
+   L.map (\(g, m) -> (simplifyFm $ con f g, mergeMap p m n)) signMaps
 
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =
   L.filter (\(f, s) -> f /= F) $ L.map (\(f, s) -> (simplifyFm f, s)) $ L.foldr accumTables [] ps
 
-simplifyFm (Unop s l) = tvSimp $ Unop s (simplifyFm l)
-simplifyFm (Binop s l r) = tvSimp $ Binop s (simplifyFm l) (simplifyFm r)
-simplifyFm pr@(Pred p) = simplifyPred pr
+applyDown f (Unop s l) = f $ Unop s (applyDown f l)
+applyDown f (Binop s l r) = f $ Binop s (applyDown f l) (applyDown f r)
+applyDown f pr@(Pred p) = f pr
+applyDown f T = T
+applyDown f F = F
+
+
+simplifyFm f = applyDown (tvSimp . simplifyPred) f
 
 tvSimp (Binop "\\/" T _) = T
 tvSimp (Binop "\\/" _ T) = T
