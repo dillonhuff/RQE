@@ -2,9 +2,9 @@ module Polynomial(Polynomial,
                   mkCon, mkPoly, mkMono, one, zero,
                   isCon, getCon,
                   deg,
-                  lcof,
+                  lcof, isPos,
                   plus, times,
-                  derivative,
+                  derivative, divideEvenly,
                   divide, pseudoDivide, pseudoRemainder) where
 
 import Data.List as L
@@ -22,6 +22,8 @@ mkMono i vars = Monomial i (M.fromList $ L.filter (\(_, c) -> c /= 0) vars)
 mkMonoMap i vars = Monomial i (M.filter (\c -> c /= 0) vars)
 
 monoCoeff (Monomial c _) = c
+
+evenPowers (Monomial _ m) = L.all (\(_, i) -> even i) $ M.toList m
 
 vars :: Monomial -> Set String
 vars (Monomial _ vs) = M.keysSet vs
@@ -195,3 +197,6 @@ nextRes var f g =
 derivative :: String -> Polynomial -> Polynomial
 derivative var (Polynomial ms) =
   mkPolyS $ S.map (\m -> setMonoDegree var ((monoDegree var m) - 1) $ monomialTimes (monoDegree var m) m) $ S.filter (\m -> monoDegree var m /= 0) ms
+
+isPos :: Polynomial -> Bool
+isPos (Polynomial monos) = L.all (\m -> (monoCoeff m) > 0 && (evenPowers m)) monos

@@ -46,7 +46,6 @@ conjunction r = Binop "/\\" r
 
 disjunction [] = false
 disjunction r = Binop "\\/" r
---disjunction x = L.foldr (\f g -> dis f g) (L.head x) (L.tail x)
 
 atomUnion (Pred a) = [a]
 atomUnion (Binop _ [l, r]) = atomUnion l ++ atomUnion r
@@ -79,7 +78,9 @@ tvSimp (Binop "/\\" [F, _]) = F
 tvSimp (Binop "/\\" [_, F]) = F
 tvSimp (Binop "/\\" [T, l]) = l
 tvSimp (Binop "/\\" [r, T]) = r
-tvSimp b@(Binop "\\/" args) = if any (\f -> f == T) args then T else b
+tvSimp b@(Binop "\\/" a) =
+  let args = L.filter (\f -> f /= F) a in
+   if any (\f -> f == T) args then T else disjunction args
 tvSimp b@(Binop "/\\" a) =
   let args = L.filter (\f -> f /= T) a in
    if all (\f -> f == T) args then T else
@@ -89,17 +90,39 @@ tvSimp f = f
 simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
 simplifyPred f@(Pred (Pr ">" p)) = if isCon p then
                                      if (getCon p) > 0 then T else F
-                                   else f
+                                   else if (isPos p) then T else f
 simplifyPred f@(Pred (Pr "<" p)) = if isCon p then
                                      if (getCon p) < 0 then T else F
-                                   else f
+                                   else if (isPos p) then F else f
 simplifyPred f = f
 
 getPoly (Pr _ p) = p
 
+isPred (Pred _) = True
+isPred _ = False
+
+getPred (Pred p) = p
+getPred _ = error "getPred"
+
+isEqZero (Pr "=" _) = True
+isEqZero _ = False
+
+simpClause :: [ArithPred] -> [ArithPred]
+simpClause a = a
+  -- let zeros = L.filter (\c -> isEqZero c) a
+  --     nonZeros = L.filter (\c -> not $ isEqZero c) a in
+  --  L.foldr (\(Pr s p) cs -> if any (\q -> divideEvenly p q /= Nothing) zeros then (Pr s zero) else (Pr s p)) nonZeros zeros
+   
+
+simplifyClause (Binop "/\\" args) =
+  let smArgs = L.map simplifyFm args
+      sArgs = if all isPred smArgs then L.map Pred $ simpClause $ L.map getPred smArgs else smArgs in
+   conjunction sArgs
+simplifyClause f = f
+
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  simplifyFm $ disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
+  simplifyFm $ disjunction $ L.map simplifyClause $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
@@ -110,10 +133,8 @@ satRows F _ = S.empty
 satRows (Pred (Pr "=" p)) st = S.fromList $ selectIntervals Zero p st
 satRows (Pred (Pr ">" p)) st = S.fromList $ selectIntervals Pos p st
 satRows (Pred (Pr "<" p)) st = S.fromList $ selectIntervals Neg p st
-satRows (Binop "\\/" args) st = S.unions $ L.map (\f -> satRows f st) args -- (satRows r st)
+satRows (Binop "\\/" args) st = S.unions $ L.map (\f -> satRows f st) args
 satRows (Binop "/\\" args) st = L.foldr (\s k -> S.intersection s k) (S.fromList $ intervals st) $ L.map (\f -> satRows f st) args
- -- (satRows r st)
---satRows (Binop "/\\" l r) st = S.intersection (satRows l st) (satRows r st)
 satRows f sts = error $ "satRows, f = " ++ show f
 
 signTables :: String -> [Polynomial] -> [(Formula ArithPred, SignTable)]
