@@ -11,6 +11,8 @@ import Data.List as L
 import Data.Map as M
 import Data.Set as S
 
+import PrettyPrint
+
 data Monomial = Monomial Integer (Map String Integer)
                 deriving (Eq, Ord)
 
@@ -70,12 +72,6 @@ instance Show Polynomial where
      if length mList == 0
      then "0"
      else sumList $ S.toList rs
-
-sumList :: Show a => [a] -> String
-sumList [] = ""
-sumList [x] = show x
-sumList (x:y:[]) = show x ++ " + " ++  show y
-sumList (x:y:rest) = show x ++ " + " ++  show y ++ " + " ++ (sumList rest)
 
 isCon p = (S.size $ varSet p) == 0
 

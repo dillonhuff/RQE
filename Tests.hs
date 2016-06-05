@@ -104,3 +104,7 @@ main = hspec $ do
     it "One variable, quadratic, true" $ do
       let f = mkPoly [mkMono 5 [("x", 2)]] in
        (projectFormula "x" (dis (con (gtz f) (ltz f)) (eqz f))) `shouldBe` true
+
+    it "Two variables, 6*x^2*y^2 < 0 is false" $ do
+      let f = mkPoly [mkMono 6 [("x", 2), ("y", 2)]] in
+       (projectFormula "y" $ projectFormula "x" (ltz f)) `shouldBe` false

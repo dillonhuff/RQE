@@ -10,10 +10,11 @@ import Data.Maybe
 import Data.Set as S
 
 import Polynomial
+import PrettyPrint
 import SignTable
 
 data Formula a = Pred a
-               | Binop String (Formula a) (Formula a)
+               | Binop String [Formula a]
                | Unop String (Formula a)
                | T
                | F
@@ -22,20 +23,21 @@ data Formula a = Pred a
 
 instance Show a => Show (Formula a) where
   show (Pred p) = "(" ++ show p ++ ")"
-  show (Binop s l r) = "(" ++ show l ++ " " ++ s ++ " " ++ show r ++ ")"
+  show (Binop s args) = "(" ++ sumList args ++ ")"
   show T = "T"
   show F = "F"
 
 true = T
 false = F
-con = Binop "/\\"
-dis = Binop "\\/"
+con a b = Binop "/\\" [a, b]
+dis a b = Binop "\\/" [a, b]
 
 disjunction [] = false
-disjunction x = L.foldr (\f g -> dis f g) (L.head x) (L.tail x)
+disjunction r = Binop "\\/" r
+--disjunction x = L.foldr (\f g -> dis f g) (L.head x) (L.tail x)
 
 atomUnion (Pred a) = [a]
-atomUnion (Binop _ l r) = atomUnion l ++ atomUnion r
+atomUnion (Binop _ [l, r]) = atomUnion l ++ atomUnion r
 atomUnion (Unop _ l) = atomUnion l
 atomUnion (Quantifier _ _ f) = atomUnion f
 atomUnion _ = []
@@ -50,20 +52,22 @@ ltz p = Pred $ Pr "<" p
 eqz p = Pred $ Pr "=" p
 
 applyDown f (Unop s l) = f $ Unop s (applyDown f l)
-applyDown f (Binop s l r) = f $ Binop s (applyDown f l) (applyDown f r)
+applyDown f (Binop s args) = f $ Binop s $ L.map (applyDown f) args
 applyDown f pr@(Pred p) = f pr
 applyDown f T = T
 applyDown f F = F
 
 simplifyFm f = applyDown (tvSimp . simplifyPred) f
 
-tvSimp (Binop "\\/" T _) = T
-tvSimp (Binop "\\/" _ T) = T
-tvSimp (Binop "/\\" T T) = T
-tvSimp (Binop "/\\" F _) = F
-tvSimp (Binop "/\\" _ F) = F
-tvSimp (Binop "/\\" T l) = l
-tvSimp (Binop "/\\" r T) = r
+tvSimp (Binop "\\/" [T, _]) = T
+tvSimp (Binop "\\/" [_, T]) = T
+tvSimp (Binop "/\\" [T, T]) = T
+tvSimp (Binop "/\\" [F, _]) = F
+tvSimp (Binop "/\\" [_, F]) = F
+tvSimp (Binop "/\\" [T, l]) = l
+tvSimp (Binop "/\\" [r, T]) = r
+tvSimp b@(Binop "\\/" args) = if any (\f -> f == T) args then T else b
+tvSimp b@(Binop "/\\" args) = if all (\f -> f == T) args then T else b
 tvSimp f = f
 
 simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
@@ -90,8 +94,10 @@ satRows F _ = S.empty
 satRows (Pred (Pr "=" p)) st = S.fromList $ selectIntervals Zero p st
 satRows (Pred (Pr ">" p)) st = S.fromList $ selectIntervals Pos p st
 satRows (Pred (Pr "<" p)) st = S.fromList $ selectIntervals Neg p st
-satRows (Binop "\\/" l r) st = S.union (satRows l st) (satRows r st)
-satRows (Binop "/\\" l r) st = S.intersection (satRows l st) (satRows r st)
+satRows (Binop "\\/" args) st = S.unions $ L.map (\f -> satRows f st) args -- (satRows r st)
+satRows (Binop "/\\" args) st = L.foldr (\s k -> S.intersection s k) (S.fromList $ intervals st) $ L.map (\f -> satRows f st) args
+ -- (satRows r st)
+--satRows (Binop "/\\" l r) st = S.intersection (satRows l st) (satRows r st)
 satRows f sts = error $ "satRows, f = " ++ show f
 
 signTables :: String -> [Polynomial] -> [(Formula ArithPred, SignTable)]
