@@ -17,23 +17,25 @@ data Monomial = Monomial Integer (Map String Integer)
 mkMono :: Integer -> [(String, Integer)] -> Monomial
 mkMono i vars = Monomial i (M.fromList $ L.filter (\(_, c) -> c /= 0) vars)
 
+mkMonoMap i vars = Monomial i (M.filter (\c -> c /= 0) vars)
+
 monoCoeff (Monomial c _) = c
 
 vars :: Monomial -> Set String
 vars (Monomial _ vs) = M.keysSet vs
 
 monomialTimes :: Integer -> Monomial -> Monomial
-monomialTimes i (Monomial c ms) = Monomial (i*c) ms
+monomialTimes i (Monomial c ms) = mkMonoMap (i*c) ms
 
 monomialProd :: Monomial -> Monomial -> Monomial
 monomialProd (Monomial c1 m1) (Monomial c2 m2) =
-  Monomial (c1*c2) $ M.unionWith (\i j -> i + j) m1 m2
+  mkMonoMap (c1*c2) $ M.unionWith (\i j -> i + j) m1 m2
 
 deleteVar :: String -> Monomial -> Monomial
-deleteVar x (Monomial c vars) = Monomial c $ M.delete x vars
+deleteVar x (Monomial c vars) = mkMonoMap c $ M.delete x vars
 
 setMonoDegree var d (Monomial c vars) =
-  Monomial c $ M.insert var d vars
+  mkMonoMap c $ M.insert var d vars
 
 monoDegree var (Monomial _ vars) =
   case M.lookup var vars of

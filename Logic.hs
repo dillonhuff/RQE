@@ -89,12 +89,40 @@ reconstructTables :: String ->
 reconstructTables s p remMap sts =
   L.concatMap (reconstructTable s p remMap) sts
 
+pointSignMap p remMap st =
+  L.foldr (\i m -> M.insert i (findRemSign remMap st i) m) M.empty (pointIntervals st)
+
+findRemSign remMap st i = error "findRemSign"
+
+condenseSignTable p remMap st =
+  filterCols (\p -> not $ elem p $ L.map snd $ M.toList remMap) st
+
+inferSigns :: Polynomial ->
+              Map Interval Sign ->
+              SignTable ->
+              [(Formula ArithPred, Map Interval Sign)]
+inferSigns p pSignMap st =
+  let ints = spanIntervals st in
+   L.foldr (signMaps p st) [(true, pSignMap)] ints
+
+signMaps :: Polynomial ->
+            SignTable ->
+            Interval ->
+            [(Formula ArithPred, Map Interval Sign)] ->
+            [(Formula ArithPred, Map Interval Sign)]
+signMaps p st i maps =
+  let fmValPairs = signs p st i in
+   [(con f g, M.insert i v m) | (f, m) <- maps, (g, v) <- fmValPairs]
+
+signs :: Polynomial -> SignTable -> Interval -> [(Formula ArithPred, Sign)]
+signs p s i = [(true, Pos)]
+
 reconstructTable s p remMap (f, st) =
-  let m = filterCols (\p -> M.member p remMap) st
-      pSgnMap = pointSignMap p st
-      m = condenseSignTable p remMap
-      signMap = inferSigns p pSgnMap in
-   error "reconstructSignTable"
+  let pSgnMap = pointSignMap p remMap st
+      m = condenseSignTable p remMap st
+      signMaps = inferSigns p pSgnMap m
+      n = deleteColumn (derivative s p) m in
+   L.map (\(g, m) -> (con f g, mergeMap p m n)) signMaps
 
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =
@@ -109,6 +137,8 @@ tvSimp (Binop "\\/" _ T) = T
 tvSimp (Binop "/\\" T T) = T
 tvSimp (Binop "/\\" F _) = F
 tvSimp (Binop "/\\" _ F) = F
+tvSimp (Binop "/\\" T l) = l
+tvSimp (Binop "/\\" r T) = r
 tvSimp f = f
 
 simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
