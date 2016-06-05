@@ -1,9 +1,9 @@
 module Polynomial(Polynomial,
                   mkCon, mkPoly, mkMono, one, zero,
                   isCon, getCon,
-                  deg,
+                  deg, tryMonicize,
                   lcof, isPos,
-                  plus, times,
+                  plus, times, divEven,
                   derivative, divideEvenly,
                   divide, pseudoDivide, pseudoRemainder) where
 
@@ -137,6 +137,21 @@ pseudoDivide var f g =
       (q, r) = rdivide var (times b f) g zero in
   (b, q, r)
 
+divEven f g = do
+  (q, r) <- divP f g
+  case r == zero of
+   True -> return q
+   False -> Nothing
+
+divP :: Polynomial -> Polynomial -> Maybe (Polynomial, Polynomial)
+divP f g =
+  case nextVar f g of
+   Just v -> divide v f g
+   Nothing -> do
+     q <- intDiv f g
+     return (q, zero)
+
+
 divide :: String -> Polynomial -> Polynomial -> Maybe (Polynomial, Polynomial)
 divide var f g =
   case g == zero of
@@ -200,3 +215,10 @@ derivative var (Polynomial ms) =
 
 isPos :: Polynomial -> Bool
 isPos (Polynomial monos) = L.all (\m -> (monoCoeff m) > 0 && (evenPowers m)) monos
+
+-- Very weak monicization for the simplifier
+tryMonicize p@(Polynomial m) =
+  case S.toList m of
+   [Monomial c m] -> mkPoly [mkMonoMap 1 m]
+   m -> p
+  

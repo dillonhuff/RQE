@@ -2,6 +2,7 @@ module Tests(main) where
 
 import Test.Hspec
 
+import Extras
 import Logic
 import Polynomial
 import SignTable
@@ -108,3 +109,6 @@ main = hspec $ do
     it "Two variables, 6*x^2*y^2 < 0 is false" $ do
       let f = mkPoly [mkMono 6 [("x", 2), ("y", 2)]] in
        (projectFormula "y" $ projectFormula "x" (ltz f)) `shouldBe` false
+
+    it "Not all quadratic equations have a variable" $ do
+       (projectFormula "x" (eqz quadratic)) `shouldNotBe` true

@@ -108,11 +108,11 @@ isEqZero (Pr "=" _) = True
 isEqZero _ = False
 
 simpClause :: [ArithPred] -> [ArithPred]
-simpClause a = a
-  -- let zeros = L.filter (\c -> isEqZero c) a
-  --     nonZeros = L.filter (\c -> not $ isEqZero c) a in
-  --  L.foldr (\(Pr s p) cs -> if any (\q -> divideEvenly p q /= Nothing) zeros then (Pr s zero) else (Pr s p)) nonZeros zeros
-   
+simpClause a =
+  let monicized = L.map (\(Pr s p) -> Pr s (tryMonicize p)) a
+      zeros = L.filter (\c -> isEqZero c) monicized
+      nonZeros = L.filter (\c -> not $ isEqZero c) monicized in
+   L.foldr (\(Pr s p) cs -> if any (\(Pr _ q) -> divEven p q /= Nothing) zeros then (Pr s zero):cs else (Pr s p):cs) nonZeros zeros
 
 simplifyClause (Binop "/\\" args) =
   let smArgs = L.map simplifyFm args
