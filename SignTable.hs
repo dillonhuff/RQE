@@ -81,13 +81,27 @@ mergeMap p sgMap st =
   let signs = L.foldr (\i sgs -> (fromJust $ M.lookup i sgMap):sgs) [] (intervals st) in
    appendCol p signs st
 
-data Sign = Zero | Pos | Neg deriving (Eq, Ord, Show)
+data Sign = Zero | Pos | Neg deriving (Eq, Ord)
 
-data Value = Inf | NInf | Var String deriving (Eq, Ord, Show)
+instance Show Sign where
+  show Zero = "0"
+  show Pos = "+"
+  show Neg = "-"
+
+data Value = Inf | NInf | Var String deriving (Eq, Ord)
+
+instance Show Value where
+  show Inf = "+inf"
+  show NInf = "-inf"
+  show (Var s) = s
 
 data Interval = Pt Value
               | Pair Value Value
-                deriving (Eq, Ord, Show)
+                deriving (Eq, Ord)
+
+instance Show Interval where
+  show (Pt v) = "(" ++ show v ++ ")"
+  show (Pair l r) = "(" ++ show l ++ ", " ++ show r ++ ")"
 
 isSpan (Pair _ _) = True
 isSpan _ = False

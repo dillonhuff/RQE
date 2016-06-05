@@ -162,15 +162,16 @@ reconstructTable s p remMap (f, st) =
   let pSgnMaps = pointSignMaps p remMap st
       m = condenseSignTable p remMap st in
    L.map (\(g, stm) -> (simplifyFm $ con f g, stm)) $
-   M.toList $ M.map (\newSt -> rebuildSignTable p newSt m) pSgnMaps
+   M.toList $ M.map (\newSt -> rebuildSignTable s p newSt m) pSgnMaps
 
-rebuildSignTable :: Polynomial ->
+rebuildSignTable :: String ->
+                    Polynomial ->
                     SignTable ->
                     SignTable ->
                     SignTable
-rebuildSignTable p ptSt oldSt =
+rebuildSignTable s p ptSt oldSt =
   let oldIntervals = intervals oldSt in
-   snd $ L.foldr (updateInterval p ptSt oldSt) (0, emptySignTable (p:(columnLabels oldSt))) oldIntervals
+   deleteColumn (derivative s p) $ snd $ L.foldr (updateInterval p ptSt oldSt) (0, emptySignTable (p:(columnLabels oldSt))) oldIntervals
 
 updateInterval :: Polynomial ->
                   SignTable ->
