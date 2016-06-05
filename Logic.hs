@@ -79,7 +79,7 @@ getPoly (Pr _ p) = p
 
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
+  simplifyFm $ disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
