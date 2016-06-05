@@ -71,7 +71,7 @@ instance Show Polynomial where
     let mList = S.toList rs in
      if length mList == 0
      then "0"
-     else sumList $ S.toList rs
+     else sumList "+" $ S.toList rs
 
 isCon p = (S.size $ varSet p) == 0
 

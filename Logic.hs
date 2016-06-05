@@ -23,14 +23,26 @@ data Formula a = Pred a
 
 instance Show a => Show (Formula a) where
   show (Pred p) = "(" ++ show p ++ ")"
-  show (Binop s args) = "(" ++ sumList args ++ ")"
+  show (Binop s args) = "(" ++ sumList s args ++ ")"
   show T = "T"
   show F = "F"
 
 true = T
+
 false = F
+
+con (Binop "/\\" l) (Binop "/\\" r) = Binop "/\\" (l ++ r)
+con s@(Unop _ _) (Binop "/\\" r) = Binop "/\\" (s:r)
+con s@(Pred _) (Binop "/\\" r) = Binop "/\\" (s:r)
+con (Binop "/\\" r) s@(Unop _ _) = Binop "/\\" (s:r)
+con (Binop "/\\" r) s@(Pred _) = Binop "/\\" (s:r)
+
 con a b = Binop "/\\" [a, b]
+
 dis a b = Binop "\\/" [a, b]
+
+conjunction [] = true
+conjunction r = Binop "/\\" r
 
 disjunction [] = false
 disjunction r = Binop "\\/" r
@@ -59,6 +71,7 @@ applyDown f F = F
 
 simplifyFm f = applyDown (tvSimp . simplifyPred) f
 
+tvSimp :: (Eq a) => Formula a -> Formula a
 tvSimp (Binop "\\/" [T, _]) = T
 tvSimp (Binop "\\/" [_, T]) = T
 tvSimp (Binop "/\\" [T, T]) = T
@@ -67,7 +80,10 @@ tvSimp (Binop "/\\" [_, F]) = F
 tvSimp (Binop "/\\" [T, l]) = l
 tvSimp (Binop "/\\" [r, T]) = r
 tvSimp b@(Binop "\\/" args) = if any (\f -> f == T) args then T else b
-tvSimp b@(Binop "/\\" args) = if all (\f -> f == T) args then T else b
+tvSimp b@(Binop "/\\" a) =
+  let args = L.filter (\f -> f /= T) a in
+   if all (\f -> f == T) args then T else
+     if any (\f -> f == F) args then F else conjunction args
 tvSimp f = f
 
 simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
