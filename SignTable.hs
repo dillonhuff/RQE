@@ -42,12 +42,15 @@ entriesWithSignAt sgn i st =
 
 numIntervals st = L.length $ intervals st
 
+conSign i = if i == 0 then Zero else if i > 0 then Pos else Neg
+
 lookupSign p i s =
-  let sgns = selectSigns p s in
-   case L.find (\(it, _) -> it == i) $ L.zip (intervals s) sgns of
-    Just (_, sgn) -> sgn
-    Nothing -> error $ "lookupSign fail, sign table is\n" ++ show s ++
-               "\nInterval is " ++ show i
+  if isCon p then conSign $ getCon p else
+    let sgns = selectSigns p s in
+     case L.find (\(it, _) -> it == i) $ L.zip (intervals s) sgns of
+      Just (_, sgn) -> sgn
+      Nothing -> error $ "lookupSign fail, sign table is\n" ++ show s ++
+                 "\nInterval is " ++ show i
 
 intervals (SignTable itvs _) = itvs
 

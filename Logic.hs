@@ -102,8 +102,8 @@ signTables var ps =
      let p = fromJust $ L.find (\p -> deg var p > 0) ps
          pd = derivative var p
          rest = L.filter (\q -> q /= p) ps
-         rems = L.map (\q -> pseudoDivide var p q) $ pd:rest
          newPs = pd:rest
+         rems = L.map (\q -> pseudoDivide var p q) newPs
          remMap = M.fromList $ L.zip newPs $ L.map (\(b, _, r) -> (b, r)) rems
          nextPolys = newPs ++ (L.map (\(_, _, r) -> r) rems)
          sts = signTables var nextPolys in
@@ -190,6 +190,10 @@ updateInterval p ptSt oldSt i (n, newSt) =
       -- NOTE: ???
       (Zero, Zero) -> (n + 1, continueRow p Pos oldSt i newSt)
       (Pos, Zero) -> (n, continueRow p Pos oldSt i newSt)
+      (Zero, Pos) -> (n, continueRow p Pos oldSt i newSt)
+      (Neg, Zero) -> (n, continueRow p Neg oldSt i newSt)
+      (Zero, Neg) -> (n, continueRow p Neg oldSt i newSt)
+      val -> error $ "updateIntervals: " ++ show val
 
 continueRow p s oldSt i newSt =
   let contRow = (p, s):(selectRow i oldSt) in
