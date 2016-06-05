@@ -1,10 +1,11 @@
 module SignTable(SignTable,
-                 Sign(..),
+                 Sign(..), Value(..),
                  Interval(..), intervals,
-                 selectIntervals, appendSignCol,
+                 selectIntervals, appendSignCol, selectSigns,
                  filterCols, deleteColumn, mergeMap,
                  spanIntervals, pointIntervals,
-                 initTable) where
+                 initTable, lookupSign,
+                 columnLabels) where
 
 import Data.List as L
 import Data.Map as M
@@ -15,14 +16,25 @@ import Polynomial
 data SignTable = SignTable [Interval] [(Polynomial, [Sign])]
                  deriving (Eq, Ord, Show)
 
+lookupSign p i s =
+  let sgns = selectSigns p s in
+   case L.find (\(it, _) -> it == i) $ L.zip (intervals s) sgns of
+    Just (_, sgn) -> sgn
+    Nothing -> error $ "lookupSign fail, sign table is\n" ++ show s
+
 intervals (SignTable itvs _) = itvs
 
 spanIntervals st = L.filter isSpan $ intervals st
 pointIntervals st = L.filter isPoint $ intervals st
 
 selectSigns :: Polynomial -> SignTable -> [Sign]
-selectSigns p (SignTable _ pls) =
-  snd $ fromJust $ L.find (\(pl, _) -> pl == p) pls
+selectSigns p s@(SignTable _ pls) =
+  case L.find (\(pl, _) -> pl == p) pls of
+    Just (_, sgns) -> sgns
+    Nothing -> error $ "selectSigns fail, sign table is\n" ++ show s ++
+               "\np is " ++ show p
+
+columnLabels (SignTable _ pls) = L.map fst pls
 
 appendSignCol :: Polynomial -> Sign -> SignTable -> SignTable
 appendSignCol p s (SignTable itvs pls) =

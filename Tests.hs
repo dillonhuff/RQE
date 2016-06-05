@@ -4,6 +4,7 @@ import Test.Hspec
 
 import Logic
 import Polynomial
+import SignTable
 
 main :: IO ()
 main = hspec $ do
@@ -64,6 +65,22 @@ main = hspec $ do
                       mkMono 2 [("z", 1), ("x", 2), ("y", 1)]]
           fp = mkPoly [mkMono 36 [("z", 5), ("x", 2), ("y", 2), ("w", 3)]] in
        derivative "w" f `shouldBe` fp
+
+  describe "Sign table computation" $ do
+
+    it "Sign table for linear function has 1 entry" $ do
+      let p = mkPoly [mkMono 7 [("z", 1)]]
+          sts = signTables "z" [p] in
+       length sts == 1
+
+    it "Sign table contains polynomial it is computed for" $ do
+      let p = mkPoly [mkMono 7 [("z", 1)]]
+      elem p (columnLabels $ snd $ head $ signTables "z" [p]) `shouldBe` True
+
+    it "Sign table for linear function gives signs" $ do
+      let p = mkPoly [mkMono 7 [("z", 1)]]
+          st = snd $ head $ signTables "z" [p] in
+       selectSigns p st `shouldBe` [Neg, Zero, Pos]
 
   describe "Quantifier elimination" $ do
 

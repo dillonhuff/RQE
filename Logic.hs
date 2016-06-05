@@ -1,7 +1,8 @@
 module Logic(Formula(..),
              projectFormula,
              con, dis, true, false,
-             gtz, ltz, eqz) where
+             gtz, ltz, eqz, simplifyFm,
+             signTables) where
 
 import Data.List as L
 import Data.Map as M
@@ -48,11 +49,39 @@ gtz p = Pred $ Pr ">" p
 ltz p = Pred $ Pr "<" p
 eqz p = Pred $ Pr "=" p
 
+
+applyDown f (Unop s l) = f $ Unop s (applyDown f l)
+applyDown f (Binop s l r) = f $ Binop s (applyDown f l) (applyDown f r)
+applyDown f pr@(Pred p) = f pr
+applyDown f T = T
+applyDown f F = F
+
+
+simplifyFm f = applyDown (tvSimp . simplifyPred) f
+
+tvSimp (Binop "\\/" T _) = T
+tvSimp (Binop "\\/" _ T) = T
+tvSimp (Binop "/\\" T T) = T
+tvSimp (Binop "/\\" F _) = F
+tvSimp (Binop "/\\" _ F) = F
+tvSimp (Binop "/\\" T l) = l
+tvSimp (Binop "/\\" r T) = r
+tvSimp f = f
+
+simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
+simplifyPred f@(Pred (Pr ">" p)) = if isCon p then
+                                     if (getCon p) > 0 then T else F
+                                   else f
+simplifyPred f@(Pred (Pr "<" p)) = if isCon p then
+                                     if (getCon p) < 0 then T else F
+                                   else f
+simplifyPred f = f
+
 getPoly (Pr _ p) = p
 
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.map getPoly $ atomUnion f
+  disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.map getPoly $ L.nub $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
@@ -116,7 +145,16 @@ signMaps p st i maps =
    [(con f g, M.insert i v m) | (f, m) <- maps, (g, v) <- fmValPairs]
 
 signs :: Polynomial -> SignTable -> Interval -> [(Formula ArithPred, Sign)]
-signs p s i = [(true, Pos)]
+signs p s i = error "signs"
+  -- case i of
+  --  Pt v -> 
+  --    let sgn = lookupSign p i s in
+  --     [(true, sgn)]
+  --  Pair l r ->
+  --    case (signAt p s l, signAt p s r) of
+  --     (Pos, Pos) -> [(true, Pos)]
+  --     (Neg, Pos) -> [(true, Pos)]
+  --     (Pos, Pos) -> [(true, Pos)]
 
 reconstructTable s p remMap (f, st) =
   let pSgnMap = pointSignMap p remMap st
@@ -128,33 +166,6 @@ reconstructTable s p remMap (f, st) =
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =
   L.filter (\(f, s) -> f /= F) $ L.map (\(f, s) -> (simplifyFm f, s)) $ L.foldr accumTables [] ps
-
-applyDown f (Unop s l) = f $ Unop s (applyDown f l)
-applyDown f (Binop s l r) = f $ Binop s (applyDown f l) (applyDown f r)
-applyDown f pr@(Pred p) = f pr
-applyDown f T = T
-applyDown f F = F
-
-
-simplifyFm f = applyDown (tvSimp . simplifyPred) f
-
-tvSimp (Binop "\\/" T _) = T
-tvSimp (Binop "\\/" _ T) = T
-tvSimp (Binop "/\\" T T) = T
-tvSimp (Binop "/\\" F _) = F
-tvSimp (Binop "/\\" _ F) = F
-tvSimp (Binop "/\\" T l) = l
-tvSimp (Binop "/\\" r T) = r
-tvSimp f = f
-
-simplifyPred f@(Pred (Pr "=" p)) = if p == zero then T else if isCon p then F else f
-simplifyPred f@(Pred (Pr ">" p)) = if isCon p then
-                                     if (getCon p) > 0 then T else F
-                                   else f
-simplifyPred f@(Pred (Pr "<" p)) = if isCon p then
-                                     if (getCon p) < 0 then T else F
-                                   else f
-simplifyPred f = f
 
 accumTables :: Polynomial ->
                [(Formula ArithPred, SignTable)] ->
