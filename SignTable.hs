@@ -6,6 +6,7 @@ module SignTable(SignTable,
                  filterCols, deleteColumn, mergeMap,
                  spanIntervals, pointIntervals,
                  initTable, lookupSign, selectRow,
+                 signAtInf, signAtNInf,
                  columnLabels) where
 
 import Data.List as L
@@ -31,6 +32,12 @@ insertRowSgn i sgn st =
 
 insertRow i r (SignTable itvs pls) =
   SignTable (itvs ++ [i]) $ L.foldr (\(p, s) m -> appendSign p s m) pls r
+
+signAtNInf p st =
+  lookupSign p (L.head $ intervals st) st
+
+signAtInf p st =
+  lookupSign p (L.head $ L.reverse $ intervals st) st
 
 appendSign p s m =
   let sgs = fromJust $ M.lookup p m in

@@ -160,23 +160,38 @@ reconstructTables :: String ->
 reconstructTables s p remMap sts =
   L.concatMap (reconstructTable s p remMap) sts
 
-pointSignMaps :: Polynomial ->
+pointSignMaps :: String ->
+                 Polynomial ->
                  Map Polynomial (Polynomial, Polynomial) ->
                  SignTable ->
                  Map (Formula ArithPred) SignTable
-pointSignMaps p remMap st =
+pointSignMaps s p remMap st =
   let pts = NInf:((points st) ++ [Inf]) in
-   L.foldr (updateTables p remMap st) (M.fromList $ [(true, emptySignTable [p])]) pts
+   L.foldr (updateTables s p remMap st) (M.fromList $ [(true, emptySignTable [p])]) pts
 
-updateTables p remMap st pt maps =
-  case pt of
-   -- NOTE: Replace this with actual computation of sign of p at infinity
-   Inf -> signProds p pt [(true, Pos)] maps
-   NInf -> signProds p pt [(true, Neg)] maps
-   _ ->
-     let (b, r) = findPseudoRem remMap st pt
-         fmSigns = caseSplitSigns b $ lookupSign r (Pt pt) st in
-      signProds p pt fmSigns maps
+signAtInfD var p pd st =
+  case (signAtInf pd st, even $ deg var p) of
+   (Pos, _) -> Pos
+   (Neg, _) -> Neg
+   n -> Pos --error $ "signAtInfD, val = " ++ show n
+
+signAtNInfD var p pd st =
+  case (signAtNInf pd st, even $ deg var p) of
+   (Pos, True) -> Pos
+   (Pos, False) -> Neg
+   (Neg, _) -> Neg
+   n -> Pos --error $ "signAtNInfD, val = " ++ show n
+
+updateTables s p remMap st pt maps =
+  let pd = derivative s p in
+   case pt of
+    -- NOTE: Replace this with actual computation of sign of p at infinity
+    Inf -> signProds p pt [(true, signAtInfD s p pd st)] maps
+    NInf -> signProds p pt [(true, signAtNInfD s p pd st)] maps
+    _ ->
+      let (b, r) = findPseudoRem remMap st pt
+          fmSigns = caseSplitSigns b $ lookupSign r (Pt pt) st in
+       signProds p pt fmSigns maps
 
 caseSplitSigns :: Polynomial -> Sign -> [(Formula ArithPred, Sign)]
 caseSplitSigns b sgn =
@@ -202,7 +217,7 @@ condenseSignTable p remMap st =
   filterCols (\p -> not $ elem p $ L.map (\(_, (_, r)) -> r) $ M.toList remMap) st
 
 reconstructTable s p remMap (f, st) =
-  let pSgnMaps = pointSignMaps p remMap st
+  let pSgnMaps = pointSignMaps s p remMap st
       m = condenseSignTable p remMap st in
    L.map (\(g, stm) -> (simplifyFm $ con f g, stm)) $
    M.toList $ M.map (\newSt -> rebuildSignTable s p newSt m) pSgnMaps

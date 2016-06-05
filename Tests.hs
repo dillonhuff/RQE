@@ -110,5 +110,5 @@ main = hspec $ do
       let f = mkPoly [mkMono 6 [("x", 2), ("y", 2)]] in
        (projectFormula "y" $ projectFormula "x" (ltz f)) `shouldBe` false
 
-    it "Not all quadratic equations have a variable" $ do
+    it "Not all quadratic equations have a root" $ do
        (projectFormula "x" (eqz quadratic)) `shouldNotBe` true
