@@ -122,7 +122,7 @@ simplifyClause f = f
 
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  simplifyFm $ disjunction $ L.map simplifyClause $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
+  simplifyFm $ disjunction $ L.nub $ L.map simplifyClause $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
@@ -171,23 +171,30 @@ pointSignMaps s p remMap st =
 
 signAtInfD var p pd st =
   case (signAtInf pd st, even $ deg var p) of
-   (Pos, _) -> Pos
-   (Neg, _) -> Neg
-   n -> Pos --error $ "signAtInfD, val = " ++ show n
+   (Pos, _) -> [(true, Pos)]
+   (Neg, _) -> [(true, Neg)]
+   (Zero, _) ->
+     let b = deleteLcof var p in
+      [(gtz b, Pos), (ltz b, Neg), (eqz b, Zero)]
+
+--   n -> error $ "signAtInfD, val = " ++ show n
 
 signAtNInfD var p pd st =
   case (signAtNInf pd st, even $ deg var p) of
-   (Pos, True) -> Pos
-   (Pos, False) -> Neg
-   (Neg, _) -> Neg
-   n -> Pos --error $ "signAtNInfD, val = " ++ show n
+   (Pos, True) -> [(true, Pos)]
+   (Pos, False) -> [(true, Neg)]
+   (Neg, _) -> [(true, Neg)]
+   (Zero, _) ->
+     let b = deleteLcof var p in
+      [(gtz b, Pos), (ltz b, Neg), (eqz b, Zero)]
+  --     n -> error $ "signAtNInfD, p = " ++ show p ++ "\n" ++ "val = " ++ show n ++ "\nsign table:\n" ++ show st
 
 updateTables s p remMap st pt maps =
   let pd = derivative s p in
    case pt of
     -- NOTE: Replace this with actual computation of sign of p at infinity
-    Inf -> signProds p pt [(true, signAtInfD s p pd st)] maps
-    NInf -> signProds p pt [(true, signAtNInfD s p pd st)] maps
+    Inf -> signProds p pt (signAtInfD s p pd st) maps
+    NInf -> signProds p pt (signAtNInfD s p pd st) maps
     _ ->
       let (b, r) = findPseudoRem remMap st pt
           fmSigns = caseSplitSigns b $ lookupSign r (Pt pt) st in
@@ -245,13 +252,14 @@ updateInterval p ptSt oldSt i (n, newSt) =
       (Pos, Pos) -> (n, continueRow p Pos oldSt i newSt)
       (Neg, Neg) -> (n, continueRow p Pos oldSt i newSt)
       (Neg, Pos) -> (n + 1, splitRow2 n p Neg Zero Pos ptSt oldSt i newSt)
+      (Pos, Neg) -> (n + 1, splitRow2 n p Pos Zero Neg ptSt oldSt i newSt)
       -- NOTE: ???
       (Zero, Zero) -> (n + 1, continueRow p Pos oldSt i newSt)
       (Pos, Zero) -> (n, continueRow p Pos oldSt i newSt)
       (Zero, Pos) -> (n, continueRow p Pos oldSt i newSt)
       (Neg, Zero) -> (n, continueRow p Neg oldSt i newSt)
       (Zero, Neg) -> (n, continueRow p Neg oldSt i newSt)
-      val -> error $ "updateIntervals: " ++ show val
+      --val -> error $ "updateIntervals: " ++ show val
 
 continueRow p s oldSt i newSt =
   let contRow = (p, s):(selectRow i oldSt) in

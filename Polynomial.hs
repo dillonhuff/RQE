@@ -3,6 +3,7 @@ module Polynomial(Polynomial,
                   isCon, getCon,
                   deg, tryMonicize,
                   lcof, isPos,
+                  deleteLcof,
                   plus, times, divEven,
                   derivative, divideEvenly,
                   divide, pseudoDivide, pseudoRemainder) where
@@ -88,6 +89,9 @@ mkCon i = mkPoly [mkMono i []]
 
 mkPolyS :: Set Monomial -> Polynomial
 mkPolyS monomials = Polynomial $ S.filter (\m -> monoCoeff m /= 0) monomials
+
+deleteLcof var p@(Polynomial ms) =
+  Polynomial $ S.filter (\m -> monoDegree var m < deg var p) ms
 
 timesInt :: Integer -> Polynomial -> Polynomial
 timesInt i (Polynomial ms) = Polynomial (S.map (\m -> monomialTimes i m) ms)
