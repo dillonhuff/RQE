@@ -49,13 +49,11 @@ gtz p = Pred $ Pr ">" p
 ltz p = Pred $ Pr "<" p
 eqz p = Pred $ Pr "=" p
 
-
 applyDown f (Unop s l) = f $ Unop s (applyDown f l)
 applyDown f (Binop s l r) = f $ Binop s (applyDown f l) (applyDown f r)
 applyDown f pr@(Pred p) = f pr
 applyDown f T = T
 applyDown f F = F
-
 
 simplifyFm f = applyDown (tvSimp . simplifyPred) f
 
@@ -81,7 +79,7 @@ getPoly (Pr _ p) = p
 
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.map getPoly $ L.nub $ atomUnion f
+  disjunction $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
@@ -104,20 +102,20 @@ signTables var ps =
      let p = fromJust $ L.find (\p -> deg var p > 0) ps
          pd = derivative var p
          rest = L.filter (\q -> q /= p) ps
-         rems = L.map (\q -> pseudoRemainder var p q) $ pd:rest
+         rems = L.map (\q -> pseudoDivide var p q) $ pd:rest
          newPs = pd:rest
-         remMap = M.fromList $ L.zip newPs rems
-         nextPolys = newPs ++ rems
+         remMap = M.fromList $ L.zip newPs $ L.map (\(b, _, r) -> (b, r)) rems
+         nextPolys = newPs ++ (L.map (\(_, _, r) -> r) rems)
          sts = signTables var nextPolys in
       reconstructTables var p remMap sts
 
 reconstructTables :: String ->
                      Polynomial ->
-                     Map Polynomial Polynomial ->
+                     Map Polynomial (Polynomial, Polynomial) ->
                      [(Formula ArithPred, SignTable)] ->
                      [(Formula ArithPred, SignTable)]
-reconstructTables s p remMap sts =
-  L.concatMap (reconstructTable s p remMap) sts
+reconstructTables s p remMap sts = error "reconstructTables"
+--  L.concatMap (reconstructTable s p remMap) sts
 
 pointSignMap p remMap st =
   L.foldr (\i m -> M.insert i (findRemSign remMap st i) m) M.empty (pointIntervals st)
@@ -140,21 +138,23 @@ signMaps :: Polynomial ->
             Interval ->
             [(Formula ArithPred, Map Interval Sign)] ->
             [(Formula ArithPred, Map Interval Sign)]
-signMaps p st i maps =
-  let fmValPairs = signs p st i in
-   [(con f g, M.insert i v m) | (f, m) <- maps, (g, v) <- fmValPairs]
-
-signs :: Polynomial -> SignTable -> Interval -> [(Formula ArithPred, Sign)]
-signs p s i = error "signs"
+signMaps p st i maps = error "signMaps"
   -- case i of
-  --  Pt v -> 
-  --    let sgn = lookupSign p i s in
-  --     [(true, sgn)]
+  --  Pt v -> error "point interval"
+  --    -- let sgn = lookupSign p i s in
+  --    --  [(true, sgn)]
   --  Pair l r ->
   --    case (signAt p s l, signAt p s r) of
   --     (Pos, Pos) -> [(true, Pos)]
-  --     (Neg, Pos) -> [(true, Pos)]
-  --     (Pos, Pos) -> [(true, Pos)]
+  --     (Neg, Neg) -> [(true, Neg)]
+  --     (Pos, Neg) -> [(true, Zero)]
+  --     (Neg, pos) -> [(true, Pos)]
+
+  -- let fmValPairs = signs p st i in
+  --  [(con f g, M.insert i v m) | (f, m) <- maps, (g, v) <- fmValPairs]
+
+signs :: Polynomial -> SignTable -> Interval -> [(Formula ArithPred, Sign)]
+signs p s i = error "signs"
 
 reconstructTable s p remMap (f, st) =
   let pSgnMap = pointSignMap p remMap st
