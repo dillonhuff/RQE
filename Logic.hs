@@ -204,12 +204,6 @@ splitRow2 n p sl sz sr ptSt oldSt i@(Pair l r) newSt =
       i3 = Pair (Var ("x" ++ (show n))) r in
    insertRow i3 r3 $ insertRow i2 r2 $ insertRow i1 r1 newSt
 
- --error $ "continueRow, p = " ++ show p ++ ", i = " ++ show i
-
-                                            --    signMaps = inferSigns p pSgnMaps m
-   --    n = deleteColumn (derivative s p) m in
-   -- L.map (\(g, m) -> (simplifyFm $ con f g, mergeMap p m n)) signMaps
-
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =
   L.filter (\(f, s) -> f /= F) $ L.map (\(f, s) -> (simplifyFm f, s)) $ L.foldr accumTables [] ps

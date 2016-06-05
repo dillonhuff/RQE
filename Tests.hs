@@ -99,4 +99,4 @@ main = hspec $ do
 
     it "One variable, false" $ do
       let f = mkPoly [mkMono 3 [("x", 1)]] in
-       (projectFormula "x" (con (gtz f) (ltz f))) `shouldBe` true
+       (projectFormula "x" (con (gtz f) (ltz f))) `shouldBe` false
