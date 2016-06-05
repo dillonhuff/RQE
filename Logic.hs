@@ -114,54 +114,101 @@ reconstructTables :: String ->
                      Map Polynomial (Polynomial, Polynomial) ->
                      [(Formula ArithPred, SignTable)] ->
                      [(Formula ArithPred, SignTable)]
-reconstructTables s p remMap sts = error "reconstructTables"
---  L.concatMap (reconstructTable s p remMap) sts
+reconstructTables s p remMap sts =
+  L.concatMap (reconstructTable s p remMap) sts
 
-pointSignMap p remMap st =
-  L.foldr (\i m -> M.insert i (findRemSign remMap st i) m) M.empty (pointIntervals st)
+pointSignMaps :: Polynomial ->
+                 Map Polynomial (Polynomial, Polynomial) ->
+                 SignTable ->
+                 Map (Formula ArithPred) SignTable
+pointSignMaps p remMap st =
+  let pts = NInf:((points st) ++ [Inf]) in
+   L.foldr (updateTables p remMap st) (M.fromList $ [(true, emptySignTable [p])]) pts
 
-findRemSign remMap st i = error "findRemSign"
+updateTables p remMap st pt maps =
+  case pt of
+   -- NOTE: Replace this with actual computation of sign of p at infinity
+   Inf -> signProds p pt [(true, Pos)] maps
+   NInf -> signProds p pt [(true, Neg)] maps
+   _ ->
+     let (b, r) = findPseudoRem remMap st pt
+         fmSigns = caseSplitSigns b $ lookupSign r (Pt pt) st in
+      signProds p pt fmSigns maps
+
+caseSplitSigns :: Polynomial -> Sign -> [(Formula ArithPred, Sign)]
+caseSplitSigns b sgn =
+  case sgn of
+   Zero -> [(gtz b, Zero), (ltz b, Zero), (eqz b, Pos), (eqz b, Neg), (eqz b, Zero)]
+   Pos -> [(gtz b, Pos), (ltz b, Neg)]
+   Neg -> [(gtz b, Neg), (ltz b, Pos)]
+
+signProds :: Polynomial ->
+             Value ->
+             [(Formula ArithPred, Sign)] ->
+             Map (Formula ArithPred) SignTable ->
+             Map (Formula ArithPred) SignTable
+signProds p pt sgns maps =
+  M.unions $ L.map (\(f, sgn) -> M.mapKeys (\k -> simplifyFm $ con f k) $
+                                 M.map (\st -> insertRowSgn (Pt pt) sgn st) maps) sgns
+
+findPseudoRem remMap st pt =
+  let p = L.head $ L.filter (\p -> M.member p remMap) $ entriesWithSignAt Zero (Pt pt) st in
+   fromJust $ M.lookup p remMap
 
 condenseSignTable p remMap st =
-  filterCols (\p -> not $ elem p $ L.map snd $ M.toList remMap) st
-
-inferSigns :: Polynomial ->
-              Map Interval Sign ->
-              SignTable ->
-              [(Formula ArithPred, Map Interval Sign)]
-inferSigns p pSignMap st =
-  let ints = spanIntervals st in
-   L.foldr (signMaps p st) [(true, pSignMap)] ints
-
-signMaps :: Polynomial ->
-            SignTable ->
-            Interval ->
-            [(Formula ArithPred, Map Interval Sign)] ->
-            [(Formula ArithPred, Map Interval Sign)]
-signMaps p st i maps = error "signMaps"
-  -- case i of
-  --  Pt v -> error "point interval"
-  --    -- let sgn = lookupSign p i s in
-  --    --  [(true, sgn)]
-  --  Pair l r ->
-  --    case (signAt p s l, signAt p s r) of
-  --     (Pos, Pos) -> [(true, Pos)]
-  --     (Neg, Neg) -> [(true, Neg)]
-  --     (Pos, Neg) -> [(true, Zero)]
-  --     (Neg, pos) -> [(true, Pos)]
-
-  -- let fmValPairs = signs p st i in
-  --  [(con f g, M.insert i v m) | (f, m) <- maps, (g, v) <- fmValPairs]
-
-signs :: Polynomial -> SignTable -> Interval -> [(Formula ArithPred, Sign)]
-signs p s i = error "signs"
+  filterCols (\p -> not $ elem p $ L.map (\(_, (_, r)) -> r) $ M.toList remMap) st
 
 reconstructTable s p remMap (f, st) =
-  let pSgnMap = pointSignMap p remMap st
-      m = condenseSignTable p remMap st
-      signMaps = inferSigns p pSgnMap m
-      n = deleteColumn (derivative s p) m in
-   L.map (\(g, m) -> (simplifyFm $ con f g, mergeMap p m n)) signMaps
+  let pSgnMaps = pointSignMaps p remMap st
+      m = condenseSignTable p remMap st in
+   L.map (\(g, stm) -> (simplifyFm $ con f g, stm)) $
+   M.toList $ M.map (\newSt -> rebuildSignTable p newSt m) pSgnMaps
+
+rebuildSignTable :: Polynomial ->
+                    SignTable ->
+                    SignTable ->
+                    SignTable
+rebuildSignTable p ptSt oldSt =
+  let oldIntervals = intervals oldSt in
+   snd $ L.foldr (updateInterval p ptSt oldSt) (0, emptySignTable (p:(columnLabels oldSt))) oldIntervals
+
+updateInterval :: Polynomial ->
+                  SignTable ->
+                  SignTable ->
+                  Interval ->
+                  (Int, SignTable) ->
+                  (Int, SignTable)
+updateInterval p ptSt oldSt i (n, newSt) =
+  case i of
+   (Pt v) -> (n, continueRow p (lookupSign p i ptSt) oldSt i newSt)
+   (Pair l r) ->
+     case (lookupSign p (Pt l) ptSt, lookupSign p (Pt r) ptSt) of
+      (Pos, Pos) -> (n, continueRow p Pos oldSt i newSt)
+      (Neg, Neg) -> (n, continueRow p Pos oldSt i newSt)
+      (Neg, Pos) -> (n + 1, splitRow2 n p Neg Zero Pos ptSt oldSt i newSt)
+      -- NOTE: ???
+      (Zero, Zero) -> (n + 1, continueRow p Pos oldSt i newSt)
+      (Pos, Zero) -> (n, continueRow p Pos oldSt i newSt)
+
+continueRow p s oldSt i newSt =
+  let contRow = (p, s):(selectRow i oldSt) in
+   insertRow i contRow newSt
+
+splitRow2 n p sl sz sr ptSt oldSt i@(Pair l r) newSt =
+  let rw = selectRow i oldSt
+      r1 = (p, sl):rw
+      r2 = (p, sz):rw
+      r3 = (p, sr):rw
+      i1 = Pair l (Var ("x" ++ (show n)))
+      i2 = Pt (Var ("x" ++ (show n)))
+      i3 = Pair (Var ("x" ++ (show n))) r in
+   insertRow i3 r3 $ insertRow i2 r2 $ insertRow i1 r1 newSt
+
+ --error $ "continueRow, p = " ++ show p ++ ", i = " ++ show i
+
+                                            --    signMaps = inferSigns p pSgnMaps m
+   --    n = deleteColumn (derivative s p) m in
+   -- L.map (\(g, m) -> (simplifyFm $ con f g, mergeMap p m n)) signMaps
 
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =
