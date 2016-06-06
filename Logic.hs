@@ -191,8 +191,6 @@ signAtInfD var p pd st =
      let b = deleteLcof var p in
       [(gtz b, Pos), (ltz b, Neg), (eqz b, Zero)]
 
---   n -> error $ "signAtInfD, val = " ++ show n
-
 signAtNInfD var p pd st =
   case (signAtNInf pd st, even $ deg var p) of
    (Pos, True) -> [(true, Pos)]
@@ -201,12 +199,10 @@ signAtNInfD var p pd st =
    (Zero, _) ->
      let b = deleteLcof var p in
       [(gtz b, Pos), (ltz b, Neg), (eqz b, Zero)]
-  --     n -> error $ "signAtNInfD, p = " ++ show p ++ "\n" ++ "val = " ++ show n ++ "\nsign table:\n" ++ show st
 
 updateTables s p remMap st pt maps =
   let pd = derivative s p in
    case pt of
-    -- NOTE: Replace this with actual computation of sign of p at infinity
     Inf -> signProds p pt (signAtInfD s p pd st) maps
     NInf -> signProds p pt (signAtNInfD s p pd st) maps
     _ ->
@@ -250,29 +246,39 @@ rebuildSignTable :: String ->
                     SignTable
 rebuildSignTable s p ptSt oldSt =
   let oldIntervals = intervals oldSt in
-   deleteColumn (derivative s p) $ snd $ L.foldr (updateInterval p ptSt oldSt) (0, emptySignTable (p:(columnLabels oldSt))) oldIntervals
+   renumberIntervals $ deleteColumn (derivative s p) $ L.foldr (updateInterval p ptSt oldSt) (emptySignTable (p:(columnLabels oldSt))) oldIntervals
 
+renumberIntervals :: SignTable -> SignTable
+renumberIntervals st = setIntervals (rrn 0 $ intervals st) st
+
+rrn _ [] = []
+rrn n ((Pair NInf _):rest) = (Pair NInf (Var $ "x" ++ show n)):(rrn n rest)
+rrn n ((Pair _ Inf):[]) = [Pair (Var $ "x" ++ show n) Inf]
+rrn n ((Pair (Var _) (Var _)):rest) = (Pair (Var $ "x" ++ show n) (Var $ "x" ++ (show (n+1)))):(rrn (n+1) rest)
+rrn n ((Pt _):rest) = (Pt $ Var $ "x" ++ show n ):(rrn n rest)
+rrn _ x = error $ "rrn: " ++ show x
+   
 updateInterval :: Polynomial ->
                   SignTable ->
                   SignTable ->
                   Interval ->
-                  (Int, SignTable) ->
-                  (Int, SignTable)
-updateInterval p ptSt oldSt i (n, newSt) =
+                  SignTable ->
+                  SignTable
+updateInterval p ptSt oldSt i newSt =
   case i of
-   (Pt v) -> (n + 1, continueRow p (lookupSign p i ptSt) oldSt (Pt $ Var $ "x" ++ (show n)) newSt)
+   (Pt v) -> continueRow p (lookupSign p i ptSt) oldSt i newSt
    (Pair l r) ->
      case (lookupSign p (Pt l) ptSt, lookupSign p (Pt r) ptSt) of
-      (Pos, Pos) -> (n, continueRow p Pos oldSt i newSt)
-      (Neg, Neg) -> (n, continueRow p Pos oldSt i newSt)
-      (Neg, Pos) -> (n + 1, splitRow2 n p Neg Zero Pos ptSt oldSt i newSt)
-      (Pos, Neg) -> (n + 1, splitRow2 n p Pos Zero Neg ptSt oldSt i newSt)
+      (Pos, Pos) -> continueRow p Pos oldSt i newSt
+      (Neg, Neg) -> continueRow p Pos oldSt i newSt
+      (Neg, Pos) -> splitRow2 0 p Neg Zero Pos ptSt oldSt i newSt
+      (Pos, Neg) -> splitRow2 0 p Pos Zero Neg ptSt oldSt i newSt
       -- NOTE: ???
-      (Zero, Zero) -> (n, continueRow p Pos oldSt i newSt)
-      (Pos, Zero) -> (n, continueRow p Pos oldSt i newSt)
-      (Zero, Pos) -> (n, continueRow p Pos oldSt i newSt)
-      (Neg, Zero) -> (n, continueRow p Neg oldSt i newSt)
-      (Zero, Neg) -> (n, continueRow p Neg oldSt i newSt)
+      (Zero, Zero) -> continueRow p Pos oldSt i newSt
+      (Pos, Zero) -> continueRow p Pos oldSt i newSt
+      (Zero, Pos) -> continueRow p Pos oldSt i newSt
+      (Neg, Zero) -> continueRow p Neg oldSt i newSt
+      (Zero, Neg) -> continueRow p Neg oldSt i newSt
 
 continueRow p s oldSt i newSt =
   let contRow = (p, s):(selectRow i oldSt) in

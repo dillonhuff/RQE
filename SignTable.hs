@@ -1,6 +1,6 @@
 module SignTable(SignTable,
                  Sign(..), Value(..),
-                 Interval(..), intervals, emptySignTable,
+                 Interval(..), intervals, emptySignTable, setIntervals,
                  selectIntervals, appendSignCol, selectSigns,
                  points, insertRow, insertRowSgn, entriesWithSignAt,
                  filterCols, deleteColumn, mergeMap,
@@ -20,6 +20,8 @@ data SignTable = SignTable [Interval] (Map Polynomial [Sign])
                  deriving (Eq, Ord, Show)
 
 ulookup e m = fromJust $ M.lookup e m
+
+setIntervals i (SignTable _ pls) = SignTable i pls
 
 selectRow :: Interval -> SignTable -> [(Polynomial, Sign)]
 selectRow i st@(SignTable _ pls) =
