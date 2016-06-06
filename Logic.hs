@@ -115,14 +115,28 @@ simpClause a =
    L.foldr (\(Pr s p) cs -> if any (\(Pr _ q) -> divEven p q /= Nothing) zeros then (Pr s zero):cs else (Pr s p):cs) nonZeros zeros
 
 simplifyClause (Binop "/\\" args) =
-  let smArgs = L.map simplifyFm args
-      sArgs = if all isPred smArgs then L.map Pred $ simpClause $ L.map getPred smArgs else smArgs in
-   conjunction sArgs
+  let smArgs = L.map simplifyFm args in
+   if all isPred smArgs
+      then
+     let sArgs = simpClause $ L.map getPred smArgs in
+      if isContradiction sArgs
+         then F
+      else conjunction $ L.map Pred sArgs
+   else conjunction smArgs
 simplifyClause f = f
+
+isContra (Pr s p) (Pr l q) = p == q && s /= l
+
+isContradiction :: [ArithPred] -> Bool
+isContradiction a =
+  L.or [isContra x y | x <- a, y <- a]
 
 projectFormula :: String -> Formula ArithPred -> Formula ArithPred
 projectFormula var f =
-  simplifyFm $ disjunction $ L.nub $ L.map simplifyClause $ L.map fst $ L.filter (\(_, t) -> hasSatAssignment f t) $ signTables var $ L.nub $ L.map getPoly $ atomUnion f
+  simplifyFm $ disjunction $
+  L.map simplifyClause $ L.map fst $
+  L.filter (\(_, t) -> hasSatAssignment f t) $
+  signTables var $ L.nub $ L.map getPoly $ atomUnion f
 
 hasSatAssignment :: Formula ArithPred -> SignTable -> Bool
 hasSatAssignment f sts = (S.size $ satRows f sts) > 0
@@ -246,7 +260,7 @@ updateInterval :: Polynomial ->
                   (Int, SignTable)
 updateInterval p ptSt oldSt i (n, newSt) =
   case i of
-   (Pt v) -> (n, continueRow p (lookupSign p i ptSt) oldSt i newSt)
+   (Pt v) -> (n + 1, continueRow p (lookupSign p i ptSt) oldSt (Pt $ Var $ "x" ++ (show n)) newSt)
    (Pair l r) ->
      case (lookupSign p (Pt l) ptSt, lookupSign p (Pt r) ptSt) of
       (Pos, Pos) -> (n, continueRow p Pos oldSt i newSt)
@@ -254,12 +268,11 @@ updateInterval p ptSt oldSt i (n, newSt) =
       (Neg, Pos) -> (n + 1, splitRow2 n p Neg Zero Pos ptSt oldSt i newSt)
       (Pos, Neg) -> (n + 1, splitRow2 n p Pos Zero Neg ptSt oldSt i newSt)
       -- NOTE: ???
-      (Zero, Zero) -> (n + 1, continueRow p Pos oldSt i newSt)
+      (Zero, Zero) -> (n, continueRow p Pos oldSt i newSt)
       (Pos, Zero) -> (n, continueRow p Pos oldSt i newSt)
       (Zero, Pos) -> (n, continueRow p Pos oldSt i newSt)
       (Neg, Zero) -> (n, continueRow p Neg oldSt i newSt)
       (Zero, Neg) -> (n, continueRow p Neg oldSt i newSt)
-      --val -> error $ "updateIntervals: " ++ show val
 
 continueRow p s oldSt i newSt =
   let contRow = (p, s):(selectRow i oldSt) in
