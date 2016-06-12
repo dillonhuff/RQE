@@ -230,8 +230,10 @@ findPseudoRem remMap st pt =
   let p = L.head $ L.filter (\p -> M.member p remMap) $ entriesWithSignAt Zero (Pt pt) st in
    fromJust $ M.lookup p remMap
 
+-- Eliminate 
 condenseSignTable p remMap st =
-  filterCols (\p -> not $ elem p $ L.map (\(_, (_, r)) -> r) $ M.toList remMap) st
+  let rst = filterCols (\p -> not $ elem p $ L.map (\(_, (_, r)) -> r) $ M.toList remMap) st in
+   filterRedundantIntervals rst
 
 reconstructTable s p remMap (f, st) =
   let pSgnMaps = pointSignMaps s p remMap st
@@ -239,60 +241,51 @@ reconstructTable s p remMap (f, st) =
    L.map (\(g, stm) -> (simplifyFm $ con f g, stm)) $
    M.toList $ M.map (\newSt -> rebuildSignTable s p newSt m) pSgnMaps
 
+assert :: (a -> Bool) -> (a -> String) -> a -> a
+assert check msg a = if check a then a else error $ "Assertion failure: " ++ msg a
+
 rebuildSignTable :: String ->
                     Polynomial ->
                     SignTable ->
                     SignTable ->
                     SignTable
 rebuildSignTable s p ptSt oldSt =
-  let oldIntervals = intervals oldSt in
-   renumberIntervals $ deleteColumn (derivative s p) $ L.foldr (updateInterval p ptSt oldSt) (emptySignTable (p:(columnLabels oldSt))) oldIntervals
+  let ost = deleteColumn (derivative s p) oldSt
+      stWithDummyP = appendSignCol p Zero ost
+      splitSt = splitIntervals p ptSt stWithDummyP
+      rebuilt = renumberIntervals splitSt in
+   rebuilt
 
-renumberIntervals :: SignTable -> SignTable
-renumberIntervals st = setIntervals (rrn 0 $ intervals st) st
+includesAllIntervalPts ptSt newSt =
+  let intervalPts = L.concatMap (\(Pair l r) -> [l, r]) $ spanIntervals newSt in
+   L.all (\l -> L.elem (Pt l) $ intervals ptSt) $ intervalPts
 
-rrn _ [] = []
-rrn n ((Pair NInf _):rest) = (Pair NInf (Var $ "x" ++ show n)):(rrn n rest)
-rrn n ((Pair _ Inf):[]) = [Pair (Var $ "x" ++ show n) Inf]
-rrn n ((Pair (Var _) (Var _)):rest) = (Pair (Var $ "x" ++ show n) (Var $ "x" ++ (show (n+1)))):(rrn (n+1) rest)
-rrn n ((Pt _):rest) = (Pt $ Var $ "x" ++ show n ):(rrn n rest)
-rrn _ x = error $ "rrn: " ++ show x
-   
-updateInterval :: Polynomial ->
-                  SignTable ->
-                  SignTable ->
-                  Interval ->
-                  SignTable ->
-                  SignTable
-updateInterval p ptSt oldSt i newSt =
+-- TODO: Check that all points of all intervals that are needed
+-- are included in the ptSt
+splitIntervals :: Polynomial -> SignTable -> SignTable -> SignTable
+splitIntervals p ptSt newSt =
+  if includesAllIntervalPts ptSt newSt
+  then 
+    let its = intervals newSt in
+     L.foldr (updateInterval p ptSt) newSt its
+  else error $ "ptSt = " ++ show ptSt ++ "\n" ++ show newSt
+
+updateInterval :: Polynomial -> SignTable -> Interval -> SignTable -> SignTable
+updateInterval p ptVals i newSt =
   case i of
-   (Pt v) -> continueRow p (lookupSign p i ptSt) oldSt i newSt
+   (Pt v) -> setSign p i (lookupSign p i ptVals) newSt
    (Pair l r) ->
-     case (lookupSign p (Pt l) ptSt, lookupSign p (Pt r) ptSt) of
-      (Pos, Pos) -> continueRow p Pos oldSt i newSt
-      (Neg, Neg) -> continueRow p Pos oldSt i newSt
-      (Neg, Pos) -> splitRow2 0 p Neg Zero Pos ptSt oldSt i newSt
-      (Pos, Neg) -> splitRow2 0 p Pos Zero Neg ptSt oldSt i newSt
+     case (lookupSign p (Pt l) ptVals, lookupSign p (Pt r) ptVals) of
+      (Pos, Pos) -> setSign p i Pos newSt
+      (Neg, Neg) -> setSign p i Neg newSt
+      (Neg, Pos) -> splitRow i p (Neg, Zero, Pos) newSt
+      (Pos, Neg) -> splitRow i p (Pos, Zero, Neg) newSt
       -- NOTE: ???
-      (Zero, Zero) -> continueRow p Pos oldSt i newSt
-      (Pos, Zero) -> continueRow p Pos oldSt i newSt
-      (Zero, Pos) -> continueRow p Pos oldSt i newSt
-      (Neg, Zero) -> continueRow p Neg oldSt i newSt
-      (Zero, Neg) -> continueRow p Neg oldSt i newSt
-
-continueRow p s oldSt i newSt =
-  let contRow = (p, s):(selectRow i oldSt) in
-   insertRow i contRow newSt
-
-splitRow2 n p sl sz sr ptSt oldSt i@(Pair l r) newSt =
-  let rw = selectRow i oldSt
-      r1 = (p, sl):rw
-      r2 = (p, sz):rw
-      r3 = (p, sr):rw
-      i1 = Pair l (Var ("x" ++ (show n)))
-      i2 = Pt (Var ("x" ++ (show n)))
-      i3 = Pair (Var ("x" ++ (show n))) r in
-   insertRow i3 r3 $ insertRow i2 r2 $ insertRow i1 r1 newSt
+      (Zero, Zero) -> setSign p i Zero newSt
+      (Pos, Zero) -> setSign p i Pos newSt
+      (Zero, Pos) -> setSign p i Pos newSt
+      (Neg, Zero) -> setSign p i Neg newSt
+      (Zero, Neg) -> setSign p i Neg newSt
 
 baseSignTables :: [Polynomial] -> [(Formula ArithPred, SignTable)]
 baseSignTables ps =

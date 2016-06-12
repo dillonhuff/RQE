@@ -4,9 +4,9 @@ module SignTable(SignTable,
                  selectIntervals, appendSignCol, selectSigns,
                  points, insertRow, insertRowSgn, entriesWithSignAt,
                  filterCols, deleteColumn, mergeMap,
-                 spanIntervals, pointIntervals,
-                 initTable, lookupSign, selectRow,
-                 signAtInf, signAtNInf,
+                 spanIntervals, pointIntervals, setSign, splitRow,
+                 initTable, lookupSign, selectRow, renumberIntervals,
+                 signAtInf, signAtNInf, filterRedundantIntervals,
                  columnLabels) where
 
 import Data.List as L
@@ -22,6 +22,73 @@ data SignTable = SignTable [Interval] (Map Polynomial [Sign])
 ulookup e m = fromJust $ M.lookup e m
 
 setIntervals i (SignTable _ pls) = SignTable i pls
+
+setSign :: Polynomial -> Interval -> Sign -> SignTable -> SignTable
+setSign p i s st =
+  let pSgns = selectSigns p st
+      ind = fromJust $ L.findIndex (\it -> it == i) $ intervals st
+      prefix = take ind pSgns
+      suffix = drop (ind+1) pSgns in
+   appendCol p (prefix ++ [s] ++ suffix) st
+
+filterRedundantIntervals st =
+  let pts = pointIntervals st in
+   clipRedundant pts st --error "e" --
+
+clipRedundant :: [Interval] -> SignTable -> SignTable
+clipRedundant pts st = L.foldr clipR st pts
+
+clipR i st =
+  let ind = fromJust $ L.findIndex (\it -> i == it) $ intervals st
+      l = (intervals st) !! (ind - 1)
+      r = (intervals st) !! (ind + 1) in
+   if L.all (\p -> sameOn p [l, i, r] st) $ columnLabels st
+   then error "clipR"
+   else st
+      
+sameOn p inds st =
+  L.length (L.nub $ L.map (\i -> lookupSign p i st) inds) == 1
+
+renumberIntervals :: SignTable -> SignTable
+renumberIntervals st = setIntervals (rrn 0 $ intervals st) st
+
+rrn _ [] = []
+rrn n ((Pair NInf Inf):[]) = [Pair NInf Inf]
+rrn n ((Pair NInf _):rest) = (Pair NInf (Var $ "x" ++ show n)):(rrn n rest)
+rrn n ((Pair _ Inf):[]) = [Pair (Var $ "x" ++ show n) Inf]
+rrn n ((Pair (Var _) (Var _)):rest) = (Pair (Var $ "x" ++ show n) (Var $ "x" ++ (show (n+1)))):(rrn (n+1) rest)
+rrn n ((Pt _):rest) = (Pt $ Var $ "x" ++ show n ):(rrn n rest)
+rrn _ x = error $ "rrn: " ++ show x
+
+dummyTriple (Pair l r) =
+  (Pair l (Var "tmp"), Pt (Var "tmp"), Pair (Var "tmp") r)
+
+newPls p (l, c, r) i pls =
+  M.fromList $ L.map (insertTripleOrDup p (l, c, r) i) $ M.toList pls
+
+insertTripleOrDup p (l, c, r) i (q, sgns) =
+  if p == q
+  then (q, insertTriple (l, c, r) i sgns)
+  else (q, duplicateTripleAt i sgns)
+
+duplicateTripleAt i sgns =
+  let prefix = take i sgns
+      suffix = drop (i+1) sgns
+      v = sgns !! i in
+   prefix ++ [v, v, v] ++ suffix
+  
+insertTriple (l, c, r) i intervals =
+  let prefix = take i intervals
+      suffix = drop (i+1) intervals in
+   prefix ++ [l, c, r] ++ suffix
+
+splitRow :: Interval -> Polynomial -> (Sign, Sign, Sign) -> SignTable -> SignTable
+splitRow i p signTriple st@(SignTable itvs pls) =
+  let ind = fromJust $ L.findIndex (\it -> it == i) $ intervals st
+      newIntTriple = dummyTriple i
+      nPls = newPls p signTriple ind pls
+      nIntervals = insertTriple newIntTriple ind itvs in
+   SignTable nIntervals nPls
 
 selectRow :: Interval -> SignTable -> [(Polynomial, Sign)]
 selectRow i st@(SignTable _ pls) =
